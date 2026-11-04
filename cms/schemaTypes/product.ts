@@ -77,9 +77,7 @@ export const productType = defineType({
               name: 'alt',
               title: 'Alt Text',
               type: 'string',
-              description: 'Alternative text for accessibility & SEO (required for every image)',
-              validation: (rule) =>
-                rule.required().error('Alt text is required for every product image'),
+              description: 'Alternative text for accessibility & SEO (optional)',
             }),
           ],
         }),
@@ -95,12 +93,16 @@ export const productType = defineType({
       description: 'Key product highlights or specifications (list of strings)',
     }),
     defineField({
-      name: 'description',
-      title: 'Description',
-      type: 'text',
+      name: 'body',
+      title: 'Body',
+      type: 'array',
       group: 'details',
-      rows: 5,
-      description: 'Detailed product description',
+      of: [
+        defineArrayMember({
+          type: 'block',
+        }),
+      ],
+      description: 'Product description and detailed content (portable text blocks)',
     }),
     defineField({
       name: 'delivery_estimate',
@@ -118,6 +120,22 @@ export const productType = defineType({
       initialValue: true,
       description: 'Toggle whether this product is visible in the storefront',
       validation: (rule) => rule.required(),
+    }),
+    defineField({
+      name: 'inStock',
+      title: 'In Stock',
+      type: 'boolean',
+      group: 'pricing',
+      initialValue: true,
+      description: 'Whether this product is currently in stock',
+    }),
+    defineField({
+      name: 'isFeatured',
+      title: 'Is Featured',
+      type: 'boolean',
+      group: 'details',
+      initialValue: false,
+      description: 'Feature this product on homepage or highlight sections',
     }),
     defineField({
       name: 'supplier_name',
@@ -150,4 +168,3 @@ export const productType = defineType({
     },
   },
 })
-

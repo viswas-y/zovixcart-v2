@@ -15,7 +15,29 @@ export const client = createClient({
 
 const imageBuilder = createImageUrlBuilder({ projectId, dataset })
 
-export function urlForImage(source: SanityImage) {
+export function hasImageAsset(
+  source: unknown
+): source is SanityImage & { asset: { _ref: string } } {
+  if (!source || typeof source !== 'object') return false
+  const s = source as Record<string, unknown>
+  const asset = s.asset as Record<string, unknown> | undefined
+  return typeof asset?._ref === 'string' || typeof asset?._id === 'string'
+}
+
+export function urlForImage(source?: SanityImage | null) {
+  if (!hasImageAsset(source)) {
+    // Return a chainable fallback to prevent runtime crashes if an image is missing asset data
+    const dummy: any = {
+      width: () => dummy,
+      height: () => dummy,
+      fit: () => dummy,
+      crop: () => dummy,
+      quality: () => dummy,
+      auto: () => dummy,
+      url: () => '',
+    }
+    return dummy
+  }
   return imageBuilder.image(source)
 }
 

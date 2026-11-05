@@ -13,14 +13,12 @@ import { STORE_NAME } from '@/lib/config'
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   variable: '--font-display',
-  weight: ['600', '700'],
   display: 'swap',
 })
 
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-sans',
-  weight: ['400', '500', '600'],
   display: 'swap',
 })
 

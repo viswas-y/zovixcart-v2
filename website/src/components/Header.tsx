@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { Category } from '@/lib/sanity/types'
+import { useCart } from '@/components/CartProvider'
 
 interface HeaderProps {
     categories: Category[]
@@ -13,6 +14,7 @@ export default function Header({ categories }: HeaderProps) {
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
+    const { totalCount, isLoaded } = useCart()
 
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
@@ -120,12 +122,27 @@ export default function Header({ categories }: HeaderProps) {
                         </form>
                     </div>
 
-                    {/* Right: Cash on delivery trust pill / badge */}
-                    <div className="flex items-center">
+                    {/* Right: Cash on delivery trust badge & Cart Icon */}
+                    <div className="flex items-center gap-2 sm:gap-3">
                         <span className="hidden items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-700 sm:inline-flex">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
                             Cash on Delivery
                         </span>
+
+                        <Link
+                            href="/cart"
+                            aria-label={`Shopping cart${totalCount > 0 ? ` with ${totalCount} items` : ' is empty'}`}
+                            className="relative inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
+                        >
+                            <svg aria-hidden="true" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.75" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                            </svg>
+                            {isLoaded && totalCount > 0 ? (
+                                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-neutral-900 px-1 text-[11px] font-bold text-white shadow-sm">
+                                    {totalCount > 99 ? '99+' : totalCount}
+                                </span>
+                            ) : null}
+                        </Link>
                     </div>
                 </div>
 
@@ -223,7 +240,7 @@ export default function Header({ categories }: HeaderProps) {
                     <div className="relative flex w-full max-w-xs flex-col bg-white shadow-xl">
                         {/* Drawer Header */}
                         <div className="flex h-16 items-center justify-between border-b border-neutral-200 px-4">
-                            <span className="text-lg font-bold text-neutral-900">Browse Categories</span>
+                            <span className="text-lg font-bold text-neutral-900">ZovixCart Menu</span>
                             <button
                                 type="button"
                                 onClick={() => setIsDrawerOpen(false)}
@@ -236,38 +253,62 @@ export default function Header({ categories }: HeaderProps) {
                             </button>
                         </div>
 
-                        {/* Category List */}
+                        {/* Navigation Links */}
                         <nav aria-label="Mobile categories" className="flex-1 overflow-y-auto p-4">
                             <div className="space-y-1">
                                 <Link
-                                    href="/"
+                                    href="/cart"
                                     onClick={() => setIsDrawerOpen(false)}
-                                    className={`flex min-h-[44px] items-center rounded-md px-3 py-2 text-base font-medium transition ${
-                                        pathname === '/'
+                                    className={`flex min-h-[44px] items-center justify-between rounded-md px-3 py-2 text-base font-medium transition ${
+                                        pathname === '/cart'
                                             ? 'bg-neutral-900 text-white'
                                             : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900'
                                     }`}
                                 >
-                                    All Products
+                                    <span>My Cart</span>
+                                    {isLoaded && totalCount > 0 ? (
+                                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                                            pathname === '/cart' ? 'bg-white text-neutral-900' : 'bg-neutral-900 text-white'
+                                        }`}>
+                                            {totalCount}
+                                        </span>
+                                    ) : null}
                                 </Link>
 
-                                {categories.map((cat) => {
-                                    const isActive = pathname === `/category/${cat.slug.current}`
-                                    return (
-                                        <Link
-                                            key={cat._id}
-                                            href={`/category/${cat.slug.current}`}
-                                            onClick={() => setIsDrawerOpen(false)}
-                                            className={`flex min-h-[44px] items-center rounded-md px-3 py-2 text-base font-medium transition ${
-                                                isActive
-                                                    ? 'bg-neutral-900 text-white'
-                                                    : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900'
-                                            }`}
-                                        >
-                                            {cat.title}
-                                        </Link>
-                                    )
-                                })}
+                                <div className="my-2 border-t border-neutral-100 pt-2">
+                                    <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                                        Categories
+                                    </p>
+                                    <Link
+                                        href="/"
+                                        onClick={() => setIsDrawerOpen(false)}
+                                        className={`flex min-h-[44px] items-center rounded-md px-3 py-2 text-base font-medium transition ${
+                                            pathname === '/'
+                                                ? 'bg-neutral-900 text-white'
+                                                : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900'
+                                        }`}
+                                    >
+                                        All Products
+                                    </Link>
+
+                                    {categories.map((cat) => {
+                                        const isActive = pathname === `/category/${cat.slug.current}`
+                                        return (
+                                            <Link
+                                                key={cat._id}
+                                                href={`/category/${cat.slug.current}`}
+                                                onClick={() => setIsDrawerOpen(false)}
+                                                className={`flex min-h-[44px] items-center rounded-md px-3 py-2 text-base font-medium transition ${
+                                                    isActive
+                                                        ? 'bg-neutral-900 text-white'
+                                                        : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900'
+                                                }`}
+                                            >
+                                                {cat.title}
+                                            </Link>
+                                        )
+                                    })}
+                                </div>
                             </div>
                         </nav>
 

@@ -5,6 +5,7 @@ import { categoriesQuery } from '@/lib/sanity/queries'
 import type { Category } from '@/lib/sanity/types'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import { CartProvider } from '@/components/CartProvider'
 
 export const metadata: Metadata = {
   title: 'ZovixCart | Home & Cleaning Essentials',
@@ -21,9 +22,11 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className="flex min-h-screen flex-col bg-white text-neutral-900 antialiased">
-        <Header categories={categories} />
-        <div className="flex-1">{children}</div>
-        <Footer categories={categories} />
+        <CartProvider>
+          <Header categories={categories} />
+          <div className="flex-1">{children}</div>
+          <Footer categories={categories} />
+        </CartProvider>
       </body>
     </html>
   )

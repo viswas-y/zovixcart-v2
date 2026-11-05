@@ -6,6 +6,7 @@ import { client, urlForImage } from '@/lib/sanity/client'
 import { productBySlugQuery } from '@/lib/sanity/queries'
 import type { Product } from '@/lib/sanity/types'
 import { formatINR, getStrikePrice } from '@/components/ProductCard'
+import AddToCartButton from '@/components/AddToCartButton'
 
 export const revalidate = 60
 
@@ -44,6 +45,7 @@ export default async function ProductPage({ params }: PageProps) {
         product.images?.filter((img) => Boolean(img?.asset?._ref || img?.asset?._id)) ?? []
     const mainImage = validImages[0]
     const thumbnails = validImages.slice(1)
+    const mainImageUrl = mainImage ? urlForImage(mainImage).width(600).height(600).fit('crop').url() : ''
 
     return (
         <main className="mx-auto max-w-6xl px-4 py-8 text-neutral-800">
@@ -139,8 +141,20 @@ export default async function ProductPage({ params }: PageProps) {
                         {outOfStock ? 'Out of stock' : lowStock ? `Only ${product.stockCount} left` : 'In stock'}
                     </p>
 
+                    {/* Add to Cart with Quantity */}
+                    <AddToCartButton
+                        product={{
+                            _id: product._id,
+                            title: product.title,
+                            slug: product.slug,
+                            price: product.price,
+                            inStock: product.inStock,
+                            imageUrl: mainImageUrl,
+                        }}
+                    />
+
                     {product.shortDescription ? (
-                        <p className="mt-5 text-neutral-700 leading-relaxed">{product.shortDescription}</p>
+                        <p className="mt-6 text-neutral-700 leading-relaxed">{product.shortDescription}</p>
                     ) : null}
 
                     {highlights?.length ? (

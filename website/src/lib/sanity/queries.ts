@@ -130,3 +130,25 @@ export function buildSearchProductsQuery(sort?: string, inStockOnly?: boolean) {
     }
   `
 }
+
+
+// Fetch order details by orderNumber
+export const orderByNumberQuery = groq`
+  *[_type == "order" && orderNumber == $orderNumber][0] {
+    _id,
+    orderNumber,
+    customerName,
+    phone,
+    address,
+    pincode,
+    city,
+    state,
+    notes,
+    items,
+    subtotal,
+    deliveryFee,
+    total,
+    status,
+    createdAt
+  }
+`

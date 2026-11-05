@@ -22,6 +22,9 @@ export interface Category {
   slug: {
     current: string
   }
+  description?: string
+  image?: SanityImage
+  order?: number
 }
 
 // Minimal Portable Text types (no extra package needed)

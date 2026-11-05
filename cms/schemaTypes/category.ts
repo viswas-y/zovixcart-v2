@@ -35,14 +35,6 @@ export const categoryType = defineType({
       options: {
         hotspot: true,
       },
-      fields: [
-        defineField({
-          name: 'alt',
-          title: 'Alt Text',
-          type: 'string',
-          description: 'Alternative text for accessibility & SEO (optional)',
-        }),
-      ],
     }),
     defineField({
       name: 'order',

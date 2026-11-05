@@ -22,3 +22,4 @@ export default async function OrderConfirmationPage({ params }: PageProps) {
 
     return <OrderSuccessView orderNumber={orderNumber} initialOrder={order} />
 }
+

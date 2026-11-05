@@ -295,3 +295,4 @@ export default function HeroSection({ products }: HeroSectionProps) {
         </section>
     )
 }
+

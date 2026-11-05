@@ -9,8 +9,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: 'var(--background)',
-        foreground: 'var(--foreground)',
+        brand: {
+          black: '#0A0A0A',
+          white: '#FFFFFF',
+        },
+      },
+      fontFamily: {
+        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+      },
+      borderRadius: {
+        DEFAULT: '12px',
+        none: '0px',
+        sm: '12px',
+        md: '12px',
+        lg: '12px',
+        xl: '12px',
+        '2xl': '12px',
+        '3xl': '12px',
+        full: '9999px',
       },
     },
   },
@@ -18,4 +35,3 @@ const config: Config = {
 }
 
 export default config
-

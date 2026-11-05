@@ -11,6 +11,11 @@ website/out/
 # Sanity build output
 dist/
 cms/dist/
+.sanity/
+cms/.sanity/
+
+# TypeScript cache
+*.tsbuildinfo
 
 # Environment variables
 .env

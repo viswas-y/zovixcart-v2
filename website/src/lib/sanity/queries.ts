@@ -77,7 +77,8 @@ export const categoriesQuery = groq`
     _id,
     _type,
     title,
-    slug
+    slug,
+    image
   }
 `
 

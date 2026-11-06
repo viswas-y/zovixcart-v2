@@ -81,13 +81,56 @@ export default function CheckoutView() {
 
   const total = subtotal + DELIVERY_FEE
 
+  function scrollToElement(id: string) {
+    if (typeof window === 'undefined') return
+    const el = document.getElementById(id) || document.querySelector(`[name="${id}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      if ('focus' in el && typeof (el as HTMLElement).focus === 'function') {
+        ;(el as HTMLElement).focus()
+      }
+    }
+  }
+
+  function cleanIndianPhone(val: string): string {
+    let digits = val.replace(/\D/g, '')
+    if (digits.length === 12 && digits.startsWith('91')) {
+      digits = digits.slice(2)
+    } else if (digits.length === 11 && digits.startsWith('0')) {
+      digits = digits.slice(1)
+    }
+    return digits.slice(0, 10)
+  }
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = e.target
+
+    if (name === 'phone') {
+      const cleanPhone = cleanIndianPhone(value)
+      setForm((prev) => ({ ...prev, phone: cleanPhone }))
+      if (errors.phone) {
+        setErrors((prev) => ({ ...prev, phone: undefined }))
+      }
+      if (submitError) setSubmitError(null)
+      return
+    }
+
+    if (name === 'pincode') {
+      const cleanPin = value.replace(/\D/g, '').slice(0, 6)
+      setForm((prev) => ({ ...prev, pincode: cleanPin }))
+      if (errors.pincode) {
+        setErrors((prev) => ({ ...prev, pincode: undefined }))
+      }
+      if (submitError) setSubmitError(null)
+      return
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }))
     // Clear specific field error as user types
     if (errors[name as keyof ValidationErrors]) {
       setErrors((prev) => ({ ...prev, [name]: undefined }))
     }
+    if (submitError) setSubmitError(null)
   }
 
   function validateClientSide(): boolean {
@@ -97,18 +140,22 @@ export default function CheckoutView() {
       errs.customerName = 'Please enter your full name (at least 2 letters)'
     }
 
-    const phoneClean = form.phone.trim().replace(/\D/g, '')
-    if (!/^[6-9]\d{9}$/.test(phoneClean)) {
-      errs.phone = 'Please enter a valid 10-digit Indian mobile number starting with 6-9'
+    const phoneClean = cleanIndianPhone(form.phone)
+    if (!phoneClean) {
+      errs.phone = 'Please enter your 10-digit mobile number'
+    } else if (!/^[6-9]\d{9}$/.test(phoneClean)) {
+      errs.phone = 'Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9'
     }
 
     if (!form.address.trim() || form.address.trim().length < 6) {
       errs.address = 'Please enter your complete delivery address (house/flat, street, area)'
     }
 
-    const pinClean = form.pincode.trim().replace(/\s/g, '')
-    if (!/^\d{6}$/.test(pinClean)) {
-      errs.pincode = 'Please enter a valid 6-digit postal pincode'
+    const pinClean = form.pincode.trim().replace(/\D/g, '')
+    if (!pinClean) {
+      errs.pincode = 'Please enter your 6-digit postal pincode'
+    } else if (!/^\d{6}$/.test(pinClean)) {
+      errs.pincode = 'Pincode must be exactly 6 digits (e.g. 682001)'
     }
 
     if (!form.city.trim() || form.city.trim().length < 2) {
@@ -120,32 +167,49 @@ export default function CheckoutView() {
     }
 
     setErrors(errs)
-    return Object.keys(errs).length === 0
+
+    const firstErrorField = Object.keys(errs)[0]
+    if (firstErrorField) {
+      scrollToElement(firstErrorField)
+      setSubmitError('Please complete the highlighted delivery details above.')
+      return false
+    }
+
+    return true
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setSubmitError(null)
 
+    if (!items || items.length === 0) {
+      setSubmitError('Your cart is empty. Please add items to your cart before proceeding.')
+      return
+    }
+
     if (!validateClientSide()) {
       return
     }
 
     setIsSubmitting(true)
+    setSubmitError(null)
+
+    const phonePayload = cleanIndianPhone(form.phone)
+    const pinPayload = form.pincode.trim().replace(/\D/g, '')
 
     try {
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customerName: form.customerName,
-          phone: form.phone,
-          address: form.address,
-          pincode: form.pincode,
-          city: form.city,
-          state: form.state,
-          notes: form.notes,
-          honeypot: form.honeypot,
+          customerName: form.customerName.trim(),
+          phone: phonePayload,
+          address: form.address.trim(),
+          pincode: pinPayload,
+          city: form.city.trim(),
+          state: form.state.trim(),
+          notes: form.notes?.trim() || undefined,
+          honeypot: form.honeypot || '',
           items: items.map((i) => ({
             productId: i.productId,
             quantity: i.quantity,
@@ -158,8 +222,10 @@ export default function CheckoutView() {
       if (!res.ok || !data.success) {
         if (data.errors) {
           setErrors(data.errors)
+          const firstErr = Object.keys(data.errors)[0]
+          if (firstErr) scrollToElement(firstErr)
         }
-        setSubmitError(data.message || 'Failed to place order. Please check your details.')
+        setSubmitError(data.message || 'Failed to place order. Please check your details and try again.')
         setIsSubmitting(false)
         return
       }
@@ -231,15 +297,28 @@ export default function CheckoutView() {
         {/* Checkout Delivery Form */}
         <div className="lg:col-span-7">
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
-            {/* Hidden Honeypot Anti-Spam Field */}
-            <div className="hidden" aria-hidden="true">
-              <label htmlFor="company-honeypot">Company</label>
+            {/* Hidden Honeypot Anti-Spam Field (isolated from browser address autofill) */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                left: '-9999px',
+                top: '-9999px',
+                width: '1px',
+                height: '1px',
+                opacity: 0,
+                overflow: 'hidden',
+                pointerEvents: 'none',
+              }}
+            >
+              <label htmlFor="zv_bot_check">Leave empty</label>
               <input
-                id="company-honeypot"
+                id="zv_bot_check"
                 type="text"
                 name="honeypot"
                 tabIndex={-1}
                 autoComplete="off"
+                data-lpignore="true"
                 value={form.honeypot}
                 onChange={handleChange}
               />
@@ -254,6 +333,7 @@ export default function CheckoutView() {
                 id="customerName"
                 name="customerName"
                 type="text"
+                autoComplete="name"
                 required
                 value={form.customerName}
                 onChange={handleChange}
@@ -281,8 +361,8 @@ export default function CheckoutView() {
                   name="phone"
                   type="tel"
                   inputMode="numeric"
+                  autoComplete="tel-national"
                   required
-                  maxLength={10}
                   value={form.phone}
                   onChange={handleChange}
                   placeholder="9876543210"
@@ -309,6 +389,7 @@ export default function CheckoutView() {
                 id="address"
                 name="address"
                 rows={3}
+                autoComplete="street-address"
                 required
                 value={form.address}
                 onChange={handleChange}
@@ -333,6 +414,7 @@ export default function CheckoutView() {
                   name="pincode"
                   type="text"
                   inputMode="numeric"
+                  autoComplete="postal-code"
                   maxLength={6}
                   required
                   value={form.pincode}
@@ -355,6 +437,7 @@ export default function CheckoutView() {
                   id="city"
                   name="city"
                   type="text"
+                  autoComplete="address-level2"
                   required
                   value={form.city}
                   onChange={handleChange}
@@ -376,6 +459,7 @@ export default function CheckoutView() {
                   id="state"
                   name="state"
                   type="text"
+                  autoComplete="address-level1"
                   required
                   value={form.state}
                   onChange={handleChange}
@@ -406,8 +490,24 @@ export default function CheckoutView() {
               />
             </div>
 
+            {/* Inline Error Banner above submit button */}
+            {submitError && (
+              <div
+                className="rounded-[12px] bg-red-50 p-3.5 text-xs sm:text-sm text-red-800 border border-red-200 shadow-sm"
+                role="alert"
+              >
+                <div className="flex items-center gap-2 font-bold text-red-900">
+                  <svg aria-hidden="true" className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                  </svg>
+                  Unable to place order
+                </div>
+                <p className="mt-1">{submitError}</p>
+              </div>
+            )}
+
             {/* Submit Button */}
-            <div className="pt-4">
+            <div className="pt-2">
               <button
                 type="submit"
                 disabled={isSubmitting || isRedirecting}

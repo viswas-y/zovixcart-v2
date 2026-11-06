@@ -6,14 +6,9 @@ import { urlForImage, hasImageAsset } from '@/lib/sanity/client'
 import type { Product } from '@/lib/sanity/types'
 import { useCart } from '@/components/CartProvider'
 
-export function formatINR(value: number) {
-  return `₹${value.toLocaleString('en-IN')}`
-}
+import { formatINR, getStrikePrice } from '@/lib/pricing'
 
-export function getStrikePrice(p: Pick<Product, 'price' | 'compare_at_price' | 'originalPrice'>) {
-  const candidate = p.compare_at_price ?? p.originalPrice
-  return candidate && candidate > p.price ? candidate : undefined
-}
+export { formatINR, getStrikePrice }
 
 export default function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart()

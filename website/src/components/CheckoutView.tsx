@@ -10,7 +10,7 @@ import type { ValidationErrors } from '@/lib/validation'
 
 export default function CheckoutView() {
   const router = useRouter()
-  const { items, subtotal, isLoaded, clearCart } = useCart()
+  const { items, subtotal, isLoaded } = useCart()
 
   const [form, setForm] = useState({
     customerName: '',
@@ -25,6 +25,7 @@ export default function CheckoutView() {
 
   const [errors, setErrors] = useState<ValidationErrors>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isRedirecting, setIsRedirecting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   if (!isLoaded) {
@@ -35,6 +36,24 @@ export default function CheckoutView() {
           <div className="lg:col-span-7 h-96 rounded-[12px] bg-neutral-100 animate-pulse" />
           <div className="lg:col-span-5 h-80 rounded-[12px] bg-neutral-100 animate-pulse" />
         </div>
+      </main>
+    )
+  }
+
+  if (isRedirecting) {
+    return (
+      <main className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center px-4 py-16 text-center text-[#0A0A0A]">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-[#0A0A0A]"
+          role="status"
+          aria-label="Loading"
+        />
+        <h1 className="mt-5 font-display text-xl font-bold tracking-tight text-[#0A0A0A] sm:text-2xl">
+          Order placed. Taking you to your order summary...
+        </h1>
+        <p className="mt-2 text-xs text-neutral-600 sm:text-sm">
+          Please wait while we prepare your confirmation.
+        </p>
       </main>
     )
   }
@@ -159,15 +178,16 @@ export default function CheckoutView() {
             createdAt: new Date().toISOString(),
           })
         )
+        sessionStorage.setItem(`just_ordered_${data.orderNumber}`, 'true')
       } catch {
         // Ignore session storage errors
       }
 
-      // Clear the cart on successful order
-      clearCart()
+      // Immediately show full-width neutral state and do NOT clear cart here
+      setIsRedirecting(true)
 
-      // Navigate to order confirmation page
-      router.push(`/order/${data.orderNumber}`)
+      // Navigate with router.replace so Back does not return to checkout
+      router.replace(`/order/${data.orderNumber}`)
     } catch {
       setSubmitError('Network error. Please check your internet connection and try again.')
       setIsSubmitting(false)
@@ -390,16 +410,16 @@ export default function CheckoutView() {
             <div className="pt-4">
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isRedirecting}
                 className="inline-flex min-h-[50px] w-full items-center justify-center rounded-[12px] bg-[#0A0A0A] px-6 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0A0A] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isSubmitting ? (
+                {isSubmitting || isRedirecting ? (
                   <span className="flex items-center gap-2">
                     <svg aria-hidden="true" className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                     </svg>
-                    Placing your order...
+                    {isRedirecting ? 'Taking you to your order summary...' : 'Placing your order...'}
                   </span>
                 ) : (
                   `Place Cash on Delivery Order • ${formatINR(total)}`

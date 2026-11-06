@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { client } from '@/lib/sanity/client'
 import { orderByNumberQuery } from '@/lib/sanity/queries'
 import OrderSuccessView from '@/components/OrderSuccessView'
+import ClearCartOnMount from '@/components/ClearCartOnMount'
 
 type PageProps = {
     params: Promise<{ orderNumber: string }>
@@ -20,6 +21,11 @@ export default async function OrderConfirmationPage({ params }: PageProps) {
 
     const order = await client.fetch(orderByNumberQuery, { orderNumber }).catch(() => null)
 
-    return <OrderSuccessView orderNumber={orderNumber} initialOrder={order} />
+    return (
+        <>
+            <ClearCartOnMount orderNumber={orderNumber} />
+            <OrderSuccessView orderNumber={orderNumber} initialOrder={order} />
+        </>
+    )
 }
 

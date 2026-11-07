@@ -133,9 +133,9 @@ export function buildSearchProductsQuery(sort?: string, inStockOnly?: boolean) {
 }
 
 
-// Fetch order details by orderNumber
+// Fetch order details by orderNumber (matching exact or raw with spaces/hyphens)
 export const orderByNumberQuery = groq`
-  *[_type == "order" && orderNumber == $orderNumber][0] {
+  *[_type == "order" && (orderNumber == $orderNumber || orderNumber == $rawOrderNumber)][0] {
     _id,
     orderNumber,
     customerName,
@@ -150,6 +150,8 @@ export const orderByNumberQuery = groq`
     deliveryFee,
     total,
     status,
-    createdAt
+    createdAt,
+    _createdAt,
+    _updatedAt
   }
 `

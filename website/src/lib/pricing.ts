@@ -1,6 +1,7 @@
 import type { Product } from '@/lib/sanity/types'
 
-export function formatINR(value: number): string {
+export function formatINR(value?: number | null): string {
+  if (value === undefined || value === null || isNaN(value)) return '₹0'
   return `₹${value.toLocaleString('en-IN')}`
 }
 

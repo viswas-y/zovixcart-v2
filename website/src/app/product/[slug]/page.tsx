@@ -148,9 +148,9 @@ export default async function ProductPage({ params }: PageProps) {
           <AddToCartButton
             product={{
               _id: product._id,
-              title: product.title,
-              slug: product.slug,
-              price: product.price,
+              title: product.title || '',
+              slug: product.slug || { current: slug },
+              price: product.price || 0,
               inStock: product.inStock,
               imageUrl: firstImageUrl,
             }}

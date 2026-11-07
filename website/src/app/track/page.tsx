@@ -17,7 +17,8 @@ export default function TrackOrderPage() {
       setError('Please enter your order number')
       return
     }
-    router.push(`/order/${encodeURIComponent(clean)}`)
+    const normalized = clean.replace(/\s+/g, '-')
+    router.push(`/order/${encodeURIComponent(normalized)}`)
   }
 
   const whatsappHelpUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
@@ -64,7 +65,7 @@ export default function TrackOrderPage() {
               setOrderNumber(e.target.value)
               if (error) setError('')
             }}
-            placeholder="e.g. ZVX-20261105-XXXX"
+            placeholder="ZVX-20261105-XXXX"
             className="mt-1.5 block min-h-[44px] w-full rounded-[12px] border border-neutral-300 bg-white px-3.5 py-2.5 font-mono text-sm uppercase text-[#0A0A0A] placeholder:normal-case placeholder:text-neutral-400 focus:border-[#0A0A0A] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A] shadow-sm"
           />
           {error && <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/components/CartProvider'
@@ -27,6 +27,72 @@ export default function CheckoutView() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [pincodeStatus, setPincodeStatus] = useState<'idle' | 'loading' | 'success' | 'not_found'>('idle')
+  const [lastLookedUpPin, setLastLookedUpPin] = useState('')
+
+  // Automatic Pincode Lookup (fetches on reaching 6 digits)
+  useEffect(() => {
+    const pin = form.pincode
+    if (pin.length !== 6) {
+      setPincodeStatus('idle')
+      return
+    }
+
+    // Only lookup when the 6-digit pin changes
+    if (pin === lastLookedUpPin) return
+
+    let cancelled = false
+    const controller = new AbortController()
+
+    async function checkPincode() {
+      setPincodeStatus('loading')
+      try {
+        const res = await fetch(`/api/pincode/${pin}`, {
+          signal: controller.signal,
+        })
+        if (cancelled) return
+
+        if (!res.ok) {
+          setPincodeStatus('not_found')
+          setLastLookedUpPin(pin)
+          return
+        }
+
+        const data = await res.json()
+        if (cancelled) return
+
+        if (data && data.district && data.state) {
+          // Fill City and State; both stay editable and won't be overwritten unless pincode changes
+          setForm((prev) => ({
+            ...prev,
+            city: data.district,
+            state: data.state,
+          }))
+          setErrors((prev) => ({
+            ...prev,
+            city: undefined,
+            state: undefined,
+          }))
+          setPincodeStatus('success')
+          setLastLookedUpPin(pin)
+        } else {
+          setPincodeStatus('not_found')
+          setLastLookedUpPin(pin)
+        }
+      } catch {
+        if (cancelled) return
+        setPincodeStatus('not_found')
+        setLastLookedUpPin(pin)
+      }
+    }
+
+    checkPincode()
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [form.pincode, lastLookedUpPin])
 
   if (!isLoaded) {
     return (
@@ -155,7 +221,7 @@ export default function CheckoutView() {
     if (!pinClean) {
       errs.pincode = 'Please enter your 6-digit postal pincode'
     } else if (!/^\d{6}$/.test(pinClean)) {
-      errs.pincode = 'Pincode must be exactly 6 digits (e.g. 682001)'
+      errs.pincode = 'Pincode must be exactly 6 digits'
     }
 
     if (!form.city.trim() || form.city.trim().length < 2) {
@@ -239,6 +305,10 @@ export default function CheckoutView() {
             customerName: data.customerName,
             phone: data.phone,
             address: data.address,
+            city: form.city.trim(),
+            state: form.state.trim(),
+            pincode: pinPayload,
+            notes: form.notes?.trim() || undefined,
             total: data.total,
             items: data.items,
             createdAt: new Date().toISOString(),
@@ -337,7 +407,7 @@ export default function CheckoutView() {
                 required
                 value={form.customerName}
                 onChange={handleChange}
-                placeholder="e.g. Rahul Sharma"
+                placeholder=""
                 className={`mt-1.5 block min-h-[44px] w-full rounded-[12px] border px-3.5 py-2.5 text-sm text-[#0A0A0A] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#0A0A0A] shadow-sm ${
                   errors.customerName ? 'border-red-500 bg-red-50/40' : 'border-neutral-300 bg-white'
                 }`}
@@ -365,7 +435,7 @@ export default function CheckoutView() {
                   required
                   value={form.phone}
                   onChange={handleChange}
-                  placeholder="9876543210"
+                  placeholder=""
                   className={`block min-h-[44px] w-full rounded-r-[12px] border px-3.5 py-2.5 text-sm text-[#0A0A0A] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#0A0A0A] ${
                     errors.phone ? 'border-red-500 bg-red-50/40' : 'border-neutral-300 bg-white'
                   }`}
@@ -393,7 +463,7 @@ export default function CheckoutView() {
                 required
                 value={form.address}
                 onChange={handleChange}
-                placeholder="House / Flat No., Building name, Street, Landmark"
+                placeholder="House / Flat no., building, street, landmark"
                 className={`mt-1.5 block w-full rounded-[12px] border p-3.5 text-sm text-[#0A0A0A] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#0A0A0A] shadow-sm ${
                   errors.address ? 'border-red-500 bg-red-50/40' : 'border-neutral-300 bg-white'
                 }`}
@@ -409,24 +479,52 @@ export default function CheckoutView() {
                 <label htmlFor="pincode" className="block text-xs font-semibold uppercase tracking-wider text-neutral-700">
                   Pincode <span className="text-red-600">*</span>
                 </label>
-                <input
-                  id="pincode"
-                  name="pincode"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="postal-code"
-                  maxLength={6}
-                  required
-                  value={form.pincode}
-                  onChange={handleChange}
-                  placeholder="e.g. 682001"
-                  className={`mt-1.5 block min-h-[44px] w-full rounded-[12px] border px-3.5 py-2.5 text-sm text-[#0A0A0A] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#0A0A0A] shadow-sm ${
-                    errors.pincode ? 'border-red-500 bg-red-50/40' : 'border-neutral-300 bg-white'
-                  }`}
-                />
-                {errors.pincode && (
+                <div className="relative mt-1.5">
+                  <input
+                    id="pincode"
+                    name="pincode"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="postal-code"
+                    maxLength={6}
+                    required
+                    value={form.pincode}
+                    onChange={handleChange}
+                    placeholder=""
+                    className={`block min-h-[44px] w-full rounded-[12px] border px-3.5 py-2.5 text-sm text-[#0A0A0A] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#0A0A0A] shadow-sm ${
+                      errors.pincode ? 'border-red-500 bg-red-50/40' : 'border-neutral-300 bg-white'
+                    }`}
+                  />
+                  {pincodeStatus === 'success' && (
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-emerald-700" title="Pincode verified" aria-hidden="true">
+                      <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
+                {errors.pincode ? (
                   <p className="mt-1.5 text-xs font-medium text-red-600">{errors.pincode}</p>
-                )}
+                ) : pincodeStatus === 'loading' ? (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-xs text-neutral-600">
+                    <svg aria-hidden="true" className="h-3.5 w-3.5 animate-spin text-neutral-500" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Checking pincode...
+                  </p>
+                ) : pincodeStatus === 'success' ? (
+                  <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-emerald-700">
+                    <svg aria-hidden="true" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    Pincode verified
+                  </p>
+                ) : pincodeStatus === 'not_found' ? (
+                  <p className="mt-1.5 text-xs text-amber-800">
+                    We could not find this pincode. Please enter your city and state yourself.
+                  </p>
+                ) : null}
               </div>
 
               <div>
@@ -441,7 +539,7 @@ export default function CheckoutView() {
                   required
                   value={form.city}
                   onChange={handleChange}
-                  placeholder="e.g. Kochi"
+                  placeholder=""
                   className={`mt-1.5 block min-h-[44px] w-full rounded-[12px] border px-3.5 py-2.5 text-sm text-[#0A0A0A] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#0A0A0A] shadow-sm ${
                     errors.city ? 'border-red-500 bg-red-50/40' : 'border-neutral-300 bg-white'
                   }`}
@@ -463,7 +561,7 @@ export default function CheckoutView() {
                   required
                   value={form.state}
                   onChange={handleChange}
-                  placeholder="e.g. Kerala"
+                  placeholder=""
                   className={`mt-1.5 block min-h-[44px] w-full rounded-[12px] border px-3.5 py-2.5 text-sm text-[#0A0A0A] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#0A0A0A] shadow-sm ${
                     errors.state ? 'border-red-500 bg-red-50/40' : 'border-neutral-300 bg-white'
                   }`}
@@ -485,7 +583,7 @@ export default function CheckoutView() {
                 type="text"
                 value={form.notes}
                 onChange={handleChange}
-                placeholder="Gate code, landmark, or delivery time preference"
+                placeholder=""
                 className="mt-1.5 block min-h-[44px] w-full rounded-[12px] border border-neutral-300 bg-white px-3.5 py-2.5 text-sm text-[#0A0A0A] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#0A0A0A] shadow-sm"
               />
             </div>

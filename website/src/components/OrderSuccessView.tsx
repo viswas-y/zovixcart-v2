@@ -13,6 +13,7 @@ interface OrderData {
   city?: string
   state?: string
   pincode?: string
+  notes?: string
   total: number
   items?: Array<{
     productId?: string
@@ -24,6 +25,7 @@ interface OrderData {
 
 interface OrderSuccessViewProps {
   orderNumber: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   initialOrder?: any
   order?: OrderData | null
 }
@@ -38,43 +40,50 @@ export default function OrderSuccessView({
 
   // Try to load cached order details from sessionStorage if not fully passed from server
   useEffect(() => {
-    if (!order && typeof window !== 'undefined') {
+    if (typeof window !== 'undefined') {
       try {
         const stored = sessionStorage.getItem(`order_${orderNumber}`)
         if (stored) {
-          setOrder(JSON.parse(stored))
+          const parsed = JSON.parse(stored)
+          setOrder((prev) => (prev ? { ...parsed, ...prev, notes: prev.notes || parsed.notes } : parsed))
         }
       } catch {
         // Ignore session storage errors
       }
     }
-  }, [order, orderNumber])
+  }, [orderNumber])
 
   const customerName = order?.customerName || 'Valued Customer'
   const total = order?.total || 0
   const items = order?.items || []
 
-  const fullAddress = [order?.address, order?.city, order?.state, order?.pincode]
-    .filter(Boolean)
-    .join(', ')
+  // Ensure full address includes pincode
+  const addressBase = order?.address || ''
+  const hasPinInBase = order?.pincode && addressBase.includes(order.pincode)
+  const fullAddress = hasPinInBase
+    ? addressBase
+    : [addressBase, order?.city, order?.state].filter(Boolean).join(', ') +
+      (order?.pincode ? ` - ${order.pincode}` : '')
 
-  // Format prefilled WhatsApp message
   const itemsSummary = items
-    .map((item) => `• ${item.title} (x${item.quantity}) - ₹${(item.price * item.quantity).toLocaleString('en-IN')}`)
+    .map((item) => `• ${item.title} (Qty: ${item.quantity}) - ₹${(item.price * item.quantity).toLocaleString('en-IN')}`)
     .join('\n')
+
+  const notesText = order?.notes?.trim() || ''
 
   const whatsappMessage = [
     `Hello ${STORE_NAME}! I just placed a Cash on Delivery order:`,
     ``,
-    `📦 *Order Number:* ${orderNumber}`,
-    `👤 *Name:* ${customerName}`,
-    `📍 *Delivery Address:* ${fullAddress}`,
-    `📞 *Phone:* ${order?.phone || ''}`,
+    `Order Number: ${orderNumber}`,
+    `Customer Name: ${customerName}`,
+    `Phone: ${order?.phone ? `+91 ${order.phone}` : ''}`,
+    `Delivery Address: ${fullAddress}`,
+    ...(notesText ? [`Delivery notes: ${notesText}`] : []),
     ``,
-    `🛍️ *Ordered Items:*`,
-    itemsSummary || `Items in order ${orderNumber}`,
+    `Items Ordered:`,
+    itemsSummary || `• Items in order ${orderNumber}`,
     ``,
-    `💰 *Total Amount:* ₹${total.toLocaleString('en-IN')} (Cash on Delivery)`,
+    `Total Amount: ₹${total.toLocaleString('en-IN')} (Cash on Delivery)`,
     ``,
     `Please confirm my order and share dispatch details. Thank you!`,
   ].join('\n')
@@ -165,6 +174,12 @@ export default function OrderSuccessView({
           <p className="font-bold text-[#0A0A0A]">{customerName}</p>
           <p className="text-neutral-600 mt-0.5">{fullAddress}</p>
           {order?.phone ? <p className="text-neutral-600 mt-0.5">Phone: +91 {order.phone}</p> : null}
+          {notesText ? (
+            <div className="mt-2.5 rounded-[8px] border border-neutral-200 bg-neutral-100 p-2.5 text-xs text-neutral-800">
+              <span className="font-semibold text-[#0A0A0A]">Delivery notes: </span>
+              <span>{notesText}</span>
+            </div>
+          ) : null}
         </div>
 
         {/* Total and Payment Instructions */}

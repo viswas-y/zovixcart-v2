@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { urlForImage, hasImageAsset } from '@/lib/sanity/client'
 import type { Product } from '@/lib/sanity/types'
 import { useCart } from '@/components/CartProvider'
@@ -11,8 +12,10 @@ import { formatINR, getStrikePrice } from '@/lib/pricing'
 export { formatINR, getStrikePrice }
 
 export default function ProductCard({ product }: { product: Product }) {
-  const { addItem } = useCart()
+  const router = useRouter()
+  const { addItem, setOrAddItem } = useCart()
   const [justAdded, setJustAdded] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
 
   // Find all valid images
   const validImages = (product.images || []).filter((img) => hasImageAsset(img))
@@ -39,7 +42,7 @@ export default function ProductCard({ product }: { product: Product }) {
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (outOfStock) return
+    if (outOfStock || isNavigating) return
 
     addItem(
       {
@@ -56,6 +59,26 @@ export default function ProductCard({ product }: { product: Product }) {
     setTimeout(() => {
       setJustAdded(false)
     }, 1800)
+  }
+
+  const handleQuickBuyNow = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (outOfStock || isNavigating) return
+
+    setIsNavigating(true)
+    setOrAddItem(
+      {
+        productId: product._id,
+        slug: product.slug.current,
+        title: product.title,
+        price: product.price,
+        imageUrl: firstImageUrl || '',
+      },
+      1
+    )
+
+    router.push('/checkout')
   }
 
   return (
@@ -149,44 +172,68 @@ export default function ProductCard({ product }: { product: Product }) {
         </p>
       </Link>
 
-      {/* Quick Add to Cart Button (does not trigger link) */}
-      <button
-        type="button"
-        onClick={handleQuickAdd}
-        disabled={outOfStock}
-        aria-label={
-          outOfStock
-            ? `${product.title} is out of stock`
-            : `Add ${product.title} to cart`
-        }
-        className={`mt-3 flex min-h-[44px] w-full items-center justify-center rounded-[12px] px-3 py-2 text-xs font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0A0A] focus-visible:ring-offset-2 ${
-          outOfStock
-            ? 'cursor-not-allowed border border-neutral-200 bg-neutral-100 text-neutral-400'
-            : justAdded
-            ? 'bg-neutral-800 text-white'
-            : 'bg-[#0A0A0A] text-white hover:bg-neutral-800 active:scale-[0.98]'
-        }`}
-      >
-        {outOfStock ? (
-          'Out of stock'
-        ) : justAdded ? (
-          <span className="flex items-center gap-1.5">
-            <svg
-              aria-hidden="true"
-              className="h-3.5 w-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="2.5"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-            </svg>
-            Added!
-          </span>
-        ) : (
-          'Add to cart'
-        )}
-      </button>
+      {/* Quick Action Buttons: Buy now (solid black) on top, Add to cart (outline) below */}
+      <div className="mt-3 flex flex-col gap-2">
+        {/* Buy Now Button */}
+        <button
+          type="button"
+          onClick={handleQuickBuyNow}
+          disabled={outOfStock || isNavigating}
+          aria-label={
+            outOfStock
+              ? `${product.title} is out of stock`
+              : `Buy ${product.title} now with Cash on Delivery`
+          }
+          className={`flex min-h-[44px] w-full items-center justify-center rounded-[12px] px-3 py-2 text-xs font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0A0A] focus-visible:ring-offset-2 ${
+            outOfStock
+              ? 'cursor-not-allowed border border-neutral-200 bg-neutral-100 text-neutral-400'
+              : isNavigating
+              ? 'bg-neutral-800 text-white cursor-wait opacity-80'
+              : 'bg-[#0A0A0A] text-white hover:bg-neutral-800 active:scale-[0.98]'
+          }`}
+        >
+          {outOfStock ? 'Out of stock' : isNavigating ? 'Wait...' : 'Buy now'}
+        </button>
+
+        {/* Add to Cart Button (outline) */}
+        <button
+          type="button"
+          onClick={handleQuickAdd}
+          disabled={outOfStock || isNavigating}
+          aria-label={
+            outOfStock
+              ? `${product.title} is out of stock`
+              : `Add ${product.title} to cart`
+          }
+          className={`flex min-h-[44px] w-full items-center justify-center rounded-[12px] px-3 py-2 text-xs font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0A0A0A] focus-visible:ring-offset-2 ${
+            outOfStock
+              ? 'cursor-not-allowed border border-neutral-200 bg-neutral-100 text-neutral-400'
+              : justAdded
+              ? 'border-2 border-neutral-800 bg-neutral-100 text-[#0A0A0A]'
+              : 'border-2 border-[#0A0A0A] bg-white text-[#0A0A0A] hover:bg-neutral-50 active:scale-[0.98]'
+          }`}
+        >
+          {outOfStock ? (
+            'Out of stock'
+          ) : justAdded ? (
+            <span className="flex items-center gap-1.5">
+              <svg
+                aria-hidden="true"
+                className="h-3.5 w-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth="2.5"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+              </svg>
+              Added!
+            </span>
+          ) : (
+            'Add to cart'
+          )}
+        </button>
+      </div>
     </div>
   )
 }

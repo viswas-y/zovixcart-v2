@@ -17,6 +17,7 @@ interface CartContextType {
     subtotal: number
     isLoaded: boolean
     addItem: (item: Omit<CartItem, 'quantity'>, quantity?: number) => void
+    setOrAddItem: (item: Omit<CartItem, 'quantity'>, quantity?: number) => void
     removeItem: (productId: string) => void
     updateQuantity: (productId: string, quantity: number) => void
     clearCart: () => void
@@ -73,6 +74,22 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         })
     }
 
+    function setOrAddItem(item: Omit<CartItem, 'quantity'>, quantity = 1) {
+        if (quantity <= 0) return
+        setItems((prev) => {
+            const existingIndex = prev.findIndex((i) => i.productId === item.productId)
+            if (existingIndex > -1) {
+                const updated = [...prev]
+                updated[existingIndex] = {
+                    ...updated[existingIndex],
+                    quantity: quantity,
+                }
+                return updated
+            }
+            return [...prev, { ...item, quantity }]
+        })
+    }
+
     function removeItem(productId: string) {
         setItems((prev) => prev.filter((i) => i.productId !== productId))
     }
@@ -107,6 +124,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 subtotal,
                 isLoaded,
                 addItem,
+                setOrAddItem,
                 removeItem,
                 updateQuantity,
                 clearCart,

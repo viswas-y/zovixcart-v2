@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/components/CartProvider'
 import { formatINR } from '@/components/ProductCard'
-import { DELIVERY_FEE } from '@/lib/config'
+import { DELIVERY_FEE, WHATSAPP_NUMBER } from '@/lib/config'
 import type { ValidationErrors } from '@/lib/validation'
 
 export default function CheckoutView() {
@@ -27,8 +27,30 @@ export default function CheckoutView() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isServerError, setIsServerError] = useState(false)
   const [pincodeStatus, setPincodeStatus] = useState<'idle' | 'loading' | 'success' | 'not_found'>('idle')
   const [lastLookedUpPin, setLastLookedUpPin] = useState('')
+
+  const GENERIC_SERVER_ERROR =
+    "We couldn't place your order right now. Please try again in a few minutes, or message us on WhatsApp and we will place it for you."
+
+  function sanitizeErrorMessage(msg?: string): string {
+    if (!msg) return GENERIC_SERVER_ERROR
+    const lower = msg.toLowerCase()
+    if (
+      lower.includes('token') ||
+      lower.includes('configured') ||
+      lower.includes('sanity') ||
+      lower.includes('environment') ||
+      lower.includes('stack') ||
+      lower.includes('error:') ||
+      lower.includes('exception') ||
+      lower.includes('internal')
+    ) {
+      return GENERIC_SERVER_ERROR
+    }
+    return msg
+  }
 
   // Automatic Pincode Lookup (fetches on reaching 6 digits)
   useEffect(() => {
@@ -178,6 +200,7 @@ export default function CheckoutView() {
         setErrors((prev) => ({ ...prev, phone: undefined }))
       }
       if (submitError) setSubmitError(null)
+      if (isServerError) setIsServerError(false)
       return
     }
 
@@ -188,6 +211,7 @@ export default function CheckoutView() {
         setErrors((prev) => ({ ...prev, pincode: undefined }))
       }
       if (submitError) setSubmitError(null)
+      if (isServerError) setIsServerError(false)
       return
     }
 
@@ -197,6 +221,7 @@ export default function CheckoutView() {
       setErrors((prev) => ({ ...prev, [name]: undefined }))
     }
     if (submitError) setSubmitError(null)
+    if (isServerError) setIsServerError(false)
   }
 
   function validateClientSide(): boolean {
@@ -247,6 +272,7 @@ export default function CheckoutView() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setSubmitError(null)
+    setIsServerError(false)
 
     if (!items || items.length === 0) {
       setSubmitError('Your cart is empty. Please add items to your cart before proceeding.')
@@ -259,6 +285,7 @@ export default function CheckoutView() {
 
     setIsSubmitting(true)
     setSubmitError(null)
+    setIsServerError(false)
 
     const phonePayload = cleanIndianPhone(form.phone)
     const pinPayload = form.pincode.trim().replace(/\D/g, '')
@@ -283,15 +310,33 @@ export default function CheckoutView() {
         }),
       })
 
-      const data = await res.json()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let data: any = null
+      try {
+        data = await res.json()
+      } catch {
+        // Non-JSON response
+      }
 
-      if (!res.ok || !data.success) {
-        if (data.errors) {
-          setErrors(data.errors)
-          const firstErr = Object.keys(data.errors)[0]
-          if (firstErr) scrollToElement(firstErr)
+      if (!res.ok || !data?.success) {
+        if (res.status >= 500 || !res.ok) {
+          setIsServerError(true)
+          setSubmitError(
+            sanitizeErrorMessage(data?.message) || GENERIC_SERVER_ERROR
+          )
+          scrollToElement('submit-banner')
+        } else {
+          setIsServerError(false)
+          if (data?.errors) {
+            setErrors(data.errors)
+            const firstErr = Object.keys(data.errors)[0]
+            if (firstErr) scrollToElement(firstErr)
+          }
+          setSubmitError(
+            sanitizeErrorMessage(data?.message) ||
+              'Failed to place order. Please check your details and try again.'
+          )
         }
-        setSubmitError(data.message || 'Failed to place order. Please check your details and try again.')
         setIsSubmitting(false)
         return
       }
@@ -325,10 +370,26 @@ export default function CheckoutView() {
       // Navigate with router.replace so Back does not return to checkout
       router.replace(`/order/${data.orderNumber}`)
     } catch {
-      setSubmitError('Network error. Please check your internet connection and try again.')
+      setIsServerError(true)
+      setSubmitError(GENERIC_SERVER_ERROR)
+      scrollToElement('submit-banner')
       setIsSubmitting(false)
     }
   }
+
+  const itemsText = items.map((i) => `• ${i.title} (x${i.quantity})`).join('\n')
+  const whatsappHelpMessage = [
+    `Hi, I tried placing an order on ZovixCart but couldn't complete checkout:`,
+    ...(form.customerName.trim() ? [`Name: ${form.customerName.trim()}`] : []),
+    ...(form.phone.trim() ? [`Phone: ${form.phone.trim()}`] : []),
+    ...(form.address.trim() ? [`Address: ${form.address.trim()}, ${form.city.trim()} ${form.pincode.trim()}`] : []),
+    ``,
+    `Items in my cart:`,
+    itemsText || `My cart items`,
+    ``,
+    `Could you please help me place this order?`,
+  ].join('\n')
+  const whatsappHelpUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappHelpMessage)}`
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 text-[#0A0A0A]">
@@ -357,9 +418,29 @@ export default function CheckoutView() {
       </header>
 
       {submitError && (
-        <div className="mb-6 rounded-[12px] bg-red-50 p-4 text-xs sm:text-sm text-red-800 border border-red-200" role="alert">
-          <p className="font-bold">Unable to place order</p>
-          <p className="mt-1">{submitError}</p>
+        <div className="mb-6 rounded-[12px] bg-red-50 p-4 text-xs sm:text-sm text-red-950 border border-red-200" role="alert">
+          <div className="flex items-center gap-2 font-bold text-red-900">
+            <svg aria-hidden="true" className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+            </svg>
+            Unable to place order
+          </div>
+          <p className="mt-1 leading-relaxed text-red-900">{submitError}</p>
+          {isServerError && (
+            <div className="mt-3.5 pt-3 border-t border-red-200/80">
+              <a
+                href={whatsappHelpUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[12px] bg-[#25D366] px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition hover:bg-[#1EBE5D] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2"
+              >
+                <svg aria-hidden="true" className="h-4 w-4 fill-current" viewBox="0 0 24 24">
+                  <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766 0-3.18-2.587-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.299.144.347.491 1.2.534 1.287.043.087.072.188.014.303-.058.116-.087.188-.173.289l-.26.303c-.087.087-.177.181-.076.355.101.173.449.741.964 1.2.662.591 1.221.774 1.394.861.173.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.144.39-.086s1.011.477 1.184.564.289.13.332.202c.045.073.045.42-.099.825zM12 2C6.477 2 2 6.477 2 12c0 1.891.526 3.66 1.438 5.168L2 22l4.987-1.396A9.957 9.957 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18.062c-1.603 0-3.095-.47-4.354-1.278l-.312-.198-2.946.824.84-2.868-.216-.328A8.026 8.026 0 0 1 3.938 12c0-4.445 3.617-8.062 8.062-8.062 4.446 0 8.063 3.617 8.063 8.062 0 4.446-3.617 8.062-8.063 8.062z" />
+                </svg>
+                Message us on WhatsApp to order
+              </a>
+            </div>
+          )}
         </div>
       )}
 
@@ -591,7 +672,8 @@ export default function CheckoutView() {
             {/* Inline Error Banner above submit button */}
             {submitError && (
               <div
-                className="rounded-[12px] bg-red-50 p-3.5 text-xs sm:text-sm text-red-800 border border-red-200 shadow-sm"
+                id="submit-banner"
+                className="rounded-[12px] bg-red-50 p-4 text-xs sm:text-sm text-red-950 border border-red-200 shadow-sm"
                 role="alert"
               >
                 <div className="flex items-center gap-2 font-bold text-red-900">
@@ -600,9 +682,24 @@ export default function CheckoutView() {
                   </svg>
                   Unable to place order
                 </div>
-                <p className="mt-1">{submitError}</p>
-              </div>
-            )}
+                <p className="mt-1.5 leading-relaxed text-red-900">{submitError}</p>
+                {isServerError && (
+                  <div className="mt-3.5 pt-3 border-t border-red-200/80">
+                    <a
+                      href={whatsappHelpUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[12px] bg-[#25D366] px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition hover:bg-[#1EBE5D] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2"
+                    >
+                      <svg aria-hidden="true" className="h-4 w-4 fill-current" viewBox="0 0 24 24">
+                        <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766 0-3.18-2.587-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.299.144.347.491 1.2.534 1.287.043.087.072.188.014.303-.058.116-.087.188-.173.289l-.26.303c-.087.087-.177.181-.076.355.101.173.449.741.964 1.2.662.591 1.221.774 1.394.861.173.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.144.39-.086s1.011.477 1.184.564.289.13.332.202c.045.073.045.42-.099.825zM12 2C6.477 2 2 6.477 2 12c0 1.891.526 3.66 1.438 5.168L2 22l4.987-1.396A9.957 9.957 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18.062c-1.603 0-3.095-.47-4.354-1.278l-.312-.198-2.946.824.84-2.868-.216-.328A8.026 8.026 0 0 1 3.938 12c0-4.445 3.617-8.062 8.062-8.062 4.446 0 8.063 3.617 8.063 8.062 0 4.446-3.617 8.062-8.063 8.062z" />
+                        </svg>
+                        Message us on WhatsApp to order
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
 
             {/* Submit Button */}
             <div className="pt-2">

@@ -155,12 +155,12 @@ export async function POST(request: NextRequest) {
         // 4. Check for Sanity Write Token
         const writeToken = process.env.SANITY_API_WRITE_TOKEN?.trim()
         if (!writeToken) {
-            console.error('SANITY_API_WRITE_TOKEN is missing in server environment variables.')
+            console.error('orders: missing SANITY_API_WRITE_TOKEN')
             return NextResponse.json(
                 {
                     success: false,
                     message:
-                        'The store is currently updating its payment & order processor (API token not configured). Please try again shortly.',
+                        "We couldn't place your order right now. Please try again in a few minutes, or message us on WhatsApp and we will place it for you.",
                 },
                 { status: 500 }
             )
@@ -210,13 +210,13 @@ export async function POST(request: NextRequest) {
             })),
         })
     } catch (err: unknown) {
-        console.error('Failed to create order in Sanity:', err)
-        const errorMessage = err instanceof Error ? err.message : 'Unknown server error'
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        console.error('orders: Sanity write error -', errorMessage)
         return NextResponse.json(
             {
                 success: false,
-                message: 'Failed to place order. Please try again.',
-                details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
+                message:
+                    "We couldn't place your order right now. Please try again in a few minutes, or message us on WhatsApp and we will place it for you.",
             },
             { status: 500 }
         )

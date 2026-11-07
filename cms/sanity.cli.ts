@@ -10,5 +10,6 @@ export default defineCliConfig({
     projectId,
     dataset,
   },
+  studioHost: 'zovixcart',
 })
 
